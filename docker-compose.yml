@@ -1,0 +1,83 @@
+services:
+  frontend:
+    build:
+      dockerfile: Dockerfile.prod
+      context: ./frontend
+    container_name: realworld-frontend
+    command: serve -s build -l 3000
+    restart: unless-stopped
+    depends_on:
+      - api
+      - auth
+    networks:
+      - realworld-network
+
+  api:
+    build: ./api
+    container_name: realworld-api
+    command: ["sh", "-c", "./health-check/wait-mongo.sh api_db:27017 -- npm run start"]
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - HOST=localhost
+      - MONGO_URL=mongodb://api_db:27017/api
+      - AUTH_API_URL=http://auth:3002/api
+    depends_on:
+      - api_db
+    networks:
+      - realworld-network
+
+  auth:
+    build: ./auth
+    container_name: realworld-auth
+    command: npm run start
+    restart: unless-stopped
+    environment:
+      - PORT=3002
+      - HOST=localhost
+      - MONGO_URL=mongodb://auth_db:27017/auth
+      - API_URL=http://api:3001/api
+    depends_on:
+      - auth_db
+    networks:
+      - realworld-network
+
+  api_db:
+    image: mongo:latest
+    container_name: realworld-api-db
+    volumes:
+      - ./api_db:/docker-entrypoint-initdb.d
+      - mongodb_api:/data/db
+    networks:
+      - realworld-network
+
+  auth_db:
+    image: mongo:latest
+    container_name: realworld-auth-db
+    volumes:
+      - mongodb_auth:/data/db
+    networks:
+      - realworld-network
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: realworld-nginx
+    working_dir: /var/www/html
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf.prod:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - api
+      - api_db
+    networks:
+      - realworld-network
+
+volumes:
+  mongodb_api:
+  mongodb_auth:
+
+networks:
+  realworld-network:
+    driver: bridge

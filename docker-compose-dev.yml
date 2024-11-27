@@ -1,0 +1,29 @@
+services:
+  frontend:
+    build:
+      dockerfile: Dockerfile.dev
+      context: ./frontend
+    command: npm run start
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./frontend/src:/var/www/html/src
+    ports:
+      - "3000:3000"
+  api:
+    command: ["sh", "-c", "./health-check/wait-mongo.sh api_db:27017 -- npm run dev"]
+    volumes:
+      - ./api/src:/var/www/html/src
+    ports:
+      - "3001:3001"
+  auth:
+    ports:
+      - "3002:3002"
+
+  api_db:
+    ports:
+      - "27017:27017"
+
+  nginx:
+    volumes:
+      - ./nginx/nginx.conf.dev:/etc/nginx/conf.d/default.conf
